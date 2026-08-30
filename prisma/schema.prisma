@@ -1,12 +1,9 @@
 // ============================================================
 // Aux Folies Gourmandes — Schéma de base de données (Prisma)
 // ============================================================
-// Par défaut : SQLite (zéro configuration, fichier local).
-// Pour passer en production sur PostgreSQL, changez "provider" en
-// "postgresql" ci-dessous ET dans .env (voir README).
 
 datasource db {
-  provider = "sqlite" // "postgresql" en production
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -56,11 +53,9 @@ model MenuItem {
 
 // ------------------------------------------------------------
 // Adresse de livraison (position GPS incluse, capturée via Leaflet)
-// Une ligne par commande : simple et suffisant pour un site de
-// livraison sans compte client persistant.
 // ------------------------------------------------------------
 model Address {
-  id          String  @id @default(cuid())
+  id          String   @id @default(cuid())
   fullAddress String
   zone        String
   latitude    Float?
@@ -98,9 +93,7 @@ model Order {
 }
 
 // ------------------------------------------------------------
-// Une ligne d'une commande (plat + quantité).
-// Nom/prix dupliqués ("snapshot") pour garder un historique fidèle
-// même si le plat change de prix ou est supprimé plus tard.
+// Une ligne d'une commande (plat + quantité)
 // ------------------------------------------------------------
 model OrderItem {
   id         Int       @id @default(autoincrement())
@@ -114,7 +107,7 @@ model OrderItem {
 }
 
 // ------------------------------------------------------------
-// Avis client, déposé après livraison (un seul avis par commande)
+// Avis client, déposé après livraison
 // ------------------------------------------------------------
 model Review {
   id        Int      @id @default(autoincrement())
