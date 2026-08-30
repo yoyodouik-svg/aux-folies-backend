@@ -1,0 +1,135 @@
+// ============================================================
+// Aux Folies Gourmandes — Schéma de base de données (Prisma)
+// ============================================================
+// Par défaut : SQLite (zéro configuration, fichier local).
+// Pour passer en production sur PostgreSQL, changez "provider" en
+// "postgresql" ci-dessous ET dans .env (voir README).
+
+datasource db {
+  provider = "sqlite" // "postgresql" en production
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum OrderStatus {
+  ATTENTE
+  PREPARATION
+  LIVRAISON
+  LIVREE
+  ANNULEE
+}
+
+// ------------------------------------------------------------
+// Comptes internes (gérant, et plus tard staff/cuisine si besoin)
+// ------------------------------------------------------------
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("ADMIN") // ADMIN aujourd'hui, extensible (CUISINE, LIVREUR...)
+  createdAt    DateTime @default(now())
+}
+
+// ------------------------------------------------------------
+// Un plat de la carte
+// ------------------------------------------------------------
+model MenuItem {
+  id          String   @id @default(cuid())
+  categoryKey String   // "entrees" | "plats" | "grillades" | "accompagnements" | "desserts"
+  name        String
+  description String
+  price       Float
+  imageUrl    String?  // photo HD (Unsplash ou photo maison), affichée sur la carte
+  tags        String   @default("") // "populaire,epice" (liste séparée par virgules)
+  active      Boolean  @default(true) // rupture de stock = false, sans supprimer le plat
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems  OrderItem[]
+
+  @@index([categoryKey])
+}
+
+// ------------------------------------------------------------
+// Adresse de livraison (position GPS incluse, capturée via Leaflet)
+// Une ligne par commande : simple et suffisant pour un site de
+// livraison sans compte client persistant.
+// ------------------------------------------------------------
+model Address {
+  id          String  @id @default(cuid())
+  fullAddress String
+  zone        String
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime @default(now())
+
+  orders      Order[]
+}
+
+// ------------------------------------------------------------
+// Une commande client
+// ------------------------------------------------------------
+model Order {
+  id            Int         @id @default(autoincrement())
+  customerName  String
+  customerPhone String
+  slot          String
+  notes         String?
+  total         Float
+  status        OrderStatus @default(ATTENTE)
+  seenByAdmin   Boolean     @default(false)
+  smsSent       Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  address       Address     @relation(fields: [addressId], references: [id])
+  addressId     String
+
+  items         OrderItem[]
+  review        Review?
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerPhone])
+}
+
+// ------------------------------------------------------------
+// Une ligne d'une commande (plat + quantité).
+// Nom/prix dupliqués ("snapshot") pour garder un historique fidèle
+// même si le plat change de prix ou est supprimé plus tard.
+// ------------------------------------------------------------
+model OrderItem {
+  id         Int       @id @default(autoincrement())
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    Int
+  menuItem   MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  menuItemId String?
+  name       String
+  price      Float
+  qty        Int
+}
+
+// ------------------------------------------------------------
+// Avis client, déposé après livraison (un seul avis par commande)
+// ------------------------------------------------------------
+model Review {
+  id        Int      @id @default(autoincrement())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   Int      @unique
+  rating    Int      // 1 à 5
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+// ------------------------------------------------------------
+// État global du restaurant (une seule ligne, id fixe = 1)
+// ------------------------------------------------------------
+model RestaurantStatus {
+  id           Int      @id @default(1)
+  isOpenManual Boolean? // null = automatique (horaires), true/false = forcé par le gérant
+  updatedAt    DateTime @updatedAt
+}
